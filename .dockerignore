@@ -1,0 +1,10 @@
+target/
+.gradle/
+.mvn/wrapper/maven-wrapper.jar
+.git/
+.env
+storage/
+*.log
+.idea/
+.vscode/
+HELP.md

@@ -1,0 +1,31 @@
+# Maven build output
+target/
+
+# Maven wrapper: commit mvnw + the properties; ignore any downloaded jar
+!.mvn/wrapper/maven-wrapper.properties
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.classpath
+.project
+.settings/
+.factorypath
+bin/
+.apt_generated/
+
+# Local env & runtime storage — NEVER commit secrets or uploaded files
+.env
+.env.local
+/storage/
+
+# misc
+HELP.md
+.DS_Store
+
+# stale Gradle output (project uses Maven -> target/)
+build/
+.gradle/

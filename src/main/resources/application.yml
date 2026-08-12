@@ -1,0 +1,86 @@
+spring:
+  application:
+    name: msj-backend
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/neondb?sslmode=require}
+    username: ${DB_USER:neondb_owner}
+    password: ${DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX:10}
+      minimum-idle: 2
+  jpa:
+    hibernate:
+      ddl-auto: validate          # schema is owned by Flyway, never by Hibernate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        format_sql: false
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 2           # V1/V2 already applied; future migrations start at V3
+    locations: classpath:db/migration
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 60MB
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USER:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${MAIL_AUTH:false}
+      mail.smtp.starttls.enable: ${MAIL_TLS:false}
+
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /
+
+# ----- application-specific config -----
+msj:
+  jwt:
+    secret: ${JWT_SECRET:change-me-in-production-a-long-random-256-bit-secret-key-value}
+    access-token-ttl-minutes: ${JWT_ACCESS_TTL:30}
+    refresh-token-ttl-days: ${JWT_REFRESH_TTL:14}
+    issuer: msj.aztu.edu.az
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:3001}
+  storage:
+    provider: ${STORAGE_PROVIDER:local}          # local | s3
+    local-path: ${STORAGE_LOCAL_PATH:./storage}
+    public-base-url: ${STORAGE_PUBLIC_URL:http://localhost:8080/files}
+  mail:
+    from: ${MAIL_FROM:no-reply@msj.aztu.edu.az}
+    enabled: ${MAIL_ENABLED:false}
+  frontend:
+    web-url: ${WEB_URL:http://localhost:3000}
+    admin-url: ${ADMIN_URL:http://localhost:3001}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+  api-docs:
+    path: /v3/api-docs
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    mail:
+      enabled: false        # dev SMTP is optional; don't fail health when it's absent
+
+logging:
+  level:
+    az.edu.aztu.msj: ${LOG_LEVEL:INFO}
+    org.flywaydb: INFO
