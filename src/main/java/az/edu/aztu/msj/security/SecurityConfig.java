@@ -90,7 +90,10 @@ public class SecurityConfig {
         CorsConfiguration cfg = new CorsConfiguration();
         List<String> origins = Arrays.stream(props.cors().allowedOrigins().split(","))
                 .map(String::trim).filter(s -> !s.isEmpty()).toList();
-        cfg.setAllowedOrigins(origins);
+        // Origin PATTERNS (not plain origins) so a wildcard "*" is permitted even with
+        // allowCredentials(true) — Spring reflects the request origin back instead of
+        // emitting a literal "*". Exact domains still match as patterns.
+        cfg.setAllowedOriginPatterns(origins);
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         cfg.setAllowedHeaders(List.of("*"));
         cfg.setExposedHeaders(List.of("Content-Disposition"));
