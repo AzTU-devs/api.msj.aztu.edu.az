@@ -12,7 +12,8 @@ public final class AdminDtos {
                             Map<String, Long> articlesByStatus) {}
 
     public record ArticleRow(Long id, String title, String status, String subjectArea, String doi,
-                             Long submitterId, OffsetDateTime submittedAt, Instant createdAt) {}
+                             Long submitterId, OffsetDateTime submittedAt, Instant createdAt,
+                             long views, long downloads, long citations) {}
 
     public record SeriesPoint(String day, long views, long downloads) {}
 

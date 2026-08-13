@@ -55,9 +55,17 @@ public class AdminService {
     public PageResponse<AdminDtos.ArticleRow> listArticles(String status, int page, int size) {
         Page<Article> result = articles.findForAdmin(blankToNull(status),
                 PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100)));
-        return PageResponse.of(result, a -> new AdminDtos.ArticleRow(
-                a.getId(), a.getTitle(), a.getStatus(), a.getSubjectArea(), a.getDoi(),
-                a.getSubmitterId(), a.getSubmittedAt(), a.getCreatedAt()));
+        Map<Long, ArticleMetric> mm = metrics.findByArticleIdIn(
+                        result.getContent().stream().map(Article::getId).toList()).stream()
+                .collect(java.util.stream.Collectors.toMap(ArticleMetric::getArticleId, m -> m));
+        return PageResponse.of(result, a -> {
+            ArticleMetric m = mm.get(a.getId());
+            return new AdminDtos.ArticleRow(
+                    a.getId(), a.getTitle(), a.getStatus(), a.getSubjectArea(), a.getDoi(),
+                    a.getSubmitterId(), a.getSubmittedAt(), a.getCreatedAt(),
+                    m == null ? 0 : m.getViewCount(), m == null ? 0 : m.getDownloadCount(),
+                    m == null ? 0 : m.getCitationCount());
+        });
     }
 
     @Transactional
