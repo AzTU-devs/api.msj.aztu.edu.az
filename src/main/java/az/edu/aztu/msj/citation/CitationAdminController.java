@@ -23,4 +23,13 @@ public class CitationAdminController {
     public CitationService.Result refresh() {
         return service.refreshAll();
     }
+
+    @PostMapping("/sync")
+    @Operation(summary = "Import missing DOIs from Crossref (by title), then refresh citation counts")
+    public CitationService.SyncResult sync() {
+        // separate calls so matchDois() runs inside its own proxied transaction
+        CitationService.MatchResult dois = service.matchDois();
+        CitationService.Result citations = service.refreshAll();
+        return new CitationService.SyncResult(dois, citations);
+    }
 }
