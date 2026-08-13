@@ -57,6 +57,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/**", "/v3/api-docs/**", "/swagger-ui/**",
                                 "/swagger-ui.html", "/actuator/health/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/files/**").permitAll()
+                        // user & role management is super-admin only
+                        .requestMatchers("/api/v1/admin/users/**")
+                        .hasRole("ADMIN")
                         // admin / editorial area
                         .requestMatchers("/api/v1/admin/**")
                         .hasAnyRole("ADMIN", "EDITOR_IN_CHIEF", "EDITOR")

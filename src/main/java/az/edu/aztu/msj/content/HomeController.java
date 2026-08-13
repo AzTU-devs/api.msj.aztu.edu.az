@@ -68,6 +68,7 @@ public class HomeController {
             List<Announcement> announcements,
             CurrentIssue currentIssue,
             List<Issue> archive,
+            List<Issue> openCalls,
             List<ContentPage> pages) {}
 
     @GetMapping
@@ -84,6 +85,8 @@ public class HomeController {
         }
         // archive shows published + archived sections (grouped by year on the web)
         List<Issue> archive = issues.findByStatusInOrderByYearDescNumberAsc(List.of("PUBLISHED", "ARCHIVED"));
+        // open calls = sections currently accepting submissions (shown as the current call on the home)
+        List<Issue> openCalls = issues.findByStatusOrderBySortOrderAsc("OPEN");
 
         return new HomeResponse(
                 settings.findById((short) 1).orElse(null),
@@ -96,6 +99,7 @@ public class HomeController {
                 announcements.findByStatusOrderByPinnedDescPublishedAtDesc("PUBLISHED"),
                 current,
                 archive,
+                openCalls,
                 pages.findByStatusOrderBySortOrderAsc("PUBLISHED")
         );
     }
