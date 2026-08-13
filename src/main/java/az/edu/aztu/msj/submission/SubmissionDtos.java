@@ -25,6 +25,7 @@ public final class SubmissionDtos {
             String keywords,
             String subjectArea,
             String language,
+            Long issueId,                     // target section the author submits to
             @NotEmpty @Valid List<AuthorInput> authors) {}
 
     public record FileDto(Long id, String kind, String originalName, Long sizeBytes, String contentType, Instant createdAt) {}
@@ -42,6 +43,7 @@ public final class SubmissionDtos {
 
     public record SubmissionDetail(Long id, String title, String abstractText, String keywords,
                                    String subjectArea, String language, String status, String doi,
+                                   Long issueId, String issueTitle,
                                    OffsetDateTime submittedAt, Instant createdAt, Instant updatedAt,
                                    List<AuthorDto> authors, List<FileDto> files,
                                    List<StatusEvent> history, List<ReviewForAuthor> reviews,

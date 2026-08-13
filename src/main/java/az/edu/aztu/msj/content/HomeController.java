@@ -82,6 +82,8 @@ public class HomeController {
             Issue latest = published.get(0);
             current = new CurrentIssue(latest, articleService.listByIssue(latest.getId()));
         }
+        // archive shows published + archived sections (grouped by year on the web)
+        List<Issue> archive = issues.findByStatusInOrderByYearDescNumberAsc(List.of("PUBLISHED", "ARCHIVED"));
 
         return new HomeResponse(
                 settings.findById((short) 1).orElse(null),
@@ -93,7 +95,7 @@ public class HomeController {
                 board.findByActiveTrueOrderBySortOrderAsc(),
                 announcements.findByStatusOrderByPinnedDescPublishedAtDesc("PUBLISHED"),
                 current,
-                published,
+                archive,
                 pages.findByStatusOrderBySortOrderAsc("PUBLISHED")
         );
     }

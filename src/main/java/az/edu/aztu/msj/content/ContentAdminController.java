@@ -224,4 +224,28 @@ public class ContentAdminController {
     public ResponseEntity<Void> deleteIssue(@PathVariable Long id) {
         issues.deleteById(id); return ResponseEntity.noContent().build();
     }
+
+    /** Open a new year: create its two sections (Number I & II) as drafts if absent. */
+    @PostMapping("/years/{year}")
+    @Operation(summary = "Open a new year — creates Number I and Number II as drafts")
+    public List<Issue> openYear(@PathVariable int year) {
+        String[] roman = {"I", "II"};
+        for (int n = 1; n <= 2; n++) {
+            if (!issues.existsByYearAndNumber(year, n)) {
+                Issue i = new Issue();
+                i.setYear(year);
+                i.setNumber(n);
+                i.setTitle("Machine Science " + year + " - Number " + roman[n - 1]);
+                i.setSlug("machine-science-" + year + "-" + n);
+                i.setStatus("DRAFT");
+                i.setSortOrder(0);
+                issues.save(i);
+            }
+        }
+        return issues.findAll().stream()
+                .filter(i -> i.getYear() != null && i.getYear() == year)
+                .sorted((a, b) -> Integer.compare(a.getNumber() == null ? 0 : a.getNumber(),
+                                                  b.getNumber() == null ? 0 : b.getNumber()))
+                .toList();
+    }
 }

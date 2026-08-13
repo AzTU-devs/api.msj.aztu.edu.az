@@ -15,6 +15,8 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
 
     List<Article> findByIssueIdOrderByArticleOrderAscTitleAsc(Long issueId);
 
+    List<Article> findByIssueIdAndStatusOrderByArticleOrderAscTitleAsc(Long issueId, String status);
+
     @Query("""
             select a from Article a
             where a.status = 'PUBLISHED'

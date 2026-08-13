@@ -46,6 +46,9 @@ public class Issue {
     @Column(name = "published_at")
     private LocalDate publishedAt;
 
+    @Column(name = "submission_deadline")
+    private LocalDate submissionDeadline;
+
     @Column(name = "sort_order", nullable = false)
     private int sortOrder = 0;
 

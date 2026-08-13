@@ -2,6 +2,8 @@ package az.edu.aztu.msj.submission;
 
 import az.edu.aztu.msj.article.*;
 import az.edu.aztu.msj.common.ApiException;
+import az.edu.aztu.msj.issue.Issue;
+import az.edu.aztu.msj.issue.IssueRepository;
 import az.edu.aztu.msj.notification.NotificationService;
 import az.edu.aztu.msj.review.Review;
 import az.edu.aztu.msj.review.ReviewRepository;
@@ -12,8 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -28,17 +30,20 @@ public class SubmissionService {
     private final ArticleFileRepository files;
     private final ArticleStatusHistoryRepository history;
     private final ReviewRepository reviews;
+    private final IssueRepository issues;
     private final UserRepository users;
     private final FileStorageService storage;
     private final NotificationService notifications;
 
     public SubmissionService(ArticleRepository articles, ArticleFileRepository files,
                              ArticleStatusHistoryRepository history, ReviewRepository reviews,
-                             UserRepository users, FileStorageService storage, NotificationService notifications) {
+                             IssueRepository issues, UserRepository users, FileStorageService storage,
+                             NotificationService notifications) {
         this.articles = articles;
         this.files = files;
         this.history = history;
         this.reviews = reviews;
+        this.issues = issues;
         this.users = users;
         this.storage = storage;
         this.notifications = notifications;
@@ -125,6 +130,20 @@ public class SubmissionService {
         if (!hasManuscript)
             throw ApiException.badRequest("A manuscript PDF is required");
 
+        // first submission must target a section that is open and before its deadline
+        // (a resubmission keeps whatever section it was already in)
+        if ("DRAFT".equals(a.getStatus())) {
+            if (a.getIssueId() == null)
+                throw ApiException.badRequest("Please choose a section to submit to");
+            Issue section = issues.findById(a.getIssueId())
+                    .orElseThrow(() -> ApiException.badRequest("Selected section not found"));
+            boolean open = "OPEN".equals(section.getStatus())
+                    && (section.getSubmissionDeadline() == null
+                        || !section.getSubmissionDeadline().isBefore(LocalDate.now()));
+            if (!open)
+                throw ApiException.badRequest("That section is closed for submissions");
+        }
+
         String from = a.getStatus();
         String to = "REVISION_REQUESTED".equals(from) ? "RESUBMITTED" : "SUBMITTED";
         a.setStatus(to);
@@ -151,6 +170,7 @@ public class SubmissionService {
         a.setKeywords(in.keywords());
         a.setSubjectArea(in.subjectArea());
         a.setLanguage(in.language() == null || in.language().isBlank() ? "en" : in.language());
+        if (in.issueId() != null) a.setIssueId(in.issueId());   // target section
 
         a.getAuthors().clear();
         List<SubmissionDtos.AuthorInput> in2 = in.authors();
@@ -212,10 +232,13 @@ public class SubmissionService {
                     .map(r -> new SubmissionDtos.ReviewForAuthor(r.getRecommendation(), r.getCommentsToAuthor(), r.getSubmittedAt()))
                     .toList();
         }
+        String issueTitle = a.getIssueId() == null ? null
+                : issues.findById(a.getIssueId()).map(Issue::getTitle).orElse(null);
         boolean canEdit = EDITABLE.contains(a.getStatus());
         return new SubmissionDtos.SubmissionDetail(a.getId(), a.getTitle(), a.getAbstractText(), a.getKeywords(),
-                a.getSubjectArea(), a.getLanguage(), a.getStatus(), a.getDoi(), a.getSubmittedAt(),
-                a.getCreatedAt(), a.getUpdatedAt(), authors, fileDtos, events, reviewDtos, editorNote, canEdit);
+                a.getSubjectArea(), a.getLanguage(), a.getStatus(), a.getDoi(), a.getIssueId(), issueTitle,
+                a.getSubmittedAt(), a.getCreatedAt(), a.getUpdatedAt(), authors, fileDtos, events, reviewDtos,
+                editorNote, canEdit);
     }
 
     private SubmissionDtos.FileDto toFileDto(ArticleFile f) {

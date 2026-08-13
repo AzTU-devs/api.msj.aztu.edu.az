@@ -36,7 +36,8 @@ public class ArticleService {
 
     @Transactional(readOnly = true)
     public List<ArticleDtos.ArticleSummary> listByIssue(Long issueId) {
-        List<Article> list = articles.findByIssueIdOrderByArticleOrderAscTitleAsc(issueId);
+        // public table of contents — only published articles appear
+        List<Article> list = articles.findByIssueIdAndStatusOrderByArticleOrderAscTitleAsc(issueId, "PUBLISHED");
         Map<Long, ArticleMetric> metricMap = metricMap(list);
         return list.stream().map(a -> toSummary(a, metricMap.get(a.getId()))).toList();
     }
