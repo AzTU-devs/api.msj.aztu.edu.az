@@ -13,6 +13,10 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
 
     Optional<Article> findByDoi(String doi);
 
+    /** Published articles that carry a DOI — the candidates for a Crossref citation lookup. */
+    @Query("select a from Article a where a.status = 'PUBLISHED' and a.doi is not null and a.doi <> ''")
+    List<Article> findPublishedWithDoi();
+
     List<Article> findByIssueIdOrderByArticleOrderAscTitleAsc(Long issueId);
 
     List<Article> findByIssueIdAndStatusOrderByArticleOrderAscTitleAsc(Long issueId, String status);

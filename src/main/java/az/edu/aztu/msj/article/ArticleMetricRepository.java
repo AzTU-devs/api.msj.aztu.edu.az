@@ -51,4 +51,15 @@ public interface ArticleMetricRepository extends JpaRepository<ArticleMetric, Lo
                 updated_at          = now()
             """, nativeQuery = true)
     void increment(@Param("articleId") Long articleId, @Param("col") String eventType);
+
+    /** Set the citation count (from Crossref), creating the metrics row if missing. */
+    @Modifying
+    @Query(value = """
+            insert into article_metrics (article_id, citation_count)
+            values (:articleId, :count)
+            on conflict (article_id) do update set
+                citation_count = :count,
+                updated_at     = now()
+            """, nativeQuery = true)
+    void setCitationCount(@Param("articleId") Long articleId, @Param("count") long count);
 }

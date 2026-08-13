@@ -59,6 +59,10 @@ msj:
   frontend:
     web-url: ${WEB_URL:http://localhost:3000}
     admin-url: ${ADMIN_URL:http://localhost:3001}
+  citations:
+    enabled: ${CITATIONS_ENABLED:true}
+    mailto: ${CITATIONS_MAILTO:msj@aztu.edu.az}      # Crossref polite-pool contact (no API key needed)
+    cron: ${CITATIONS_CRON:0 0 3 * * SUN}            # weekly refresh, Sunday 03:00
 
 springdoc:
   swagger-ui:
