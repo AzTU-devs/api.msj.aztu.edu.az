@@ -61,9 +61,15 @@ public class AuthService {
         user.setPasswordHash(passwordEncoder.encode(req.password()));
         user.setFirstName(req.firstName());
         user.setLastName(req.lastName());
+        user.setTitle(req.title());
+        user.setPhone(req.phone());
+        user.setDegree(req.degree());
+        user.setPosition(req.position());
         user.setAffiliation(req.affiliation());
         user.setCountry(req.country());
         user.setOrcid(req.orcid());
+        user.setCity(req.city());
+        user.setPostalCode(req.postalCode());
         user.setStatus("ACTIVE"); // NOTE: switch to PENDING + email verification before production
         user.getRoles().add("AUTHOR");
         users.save(user);

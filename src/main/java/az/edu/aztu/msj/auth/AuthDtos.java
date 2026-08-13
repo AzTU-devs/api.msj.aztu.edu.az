@@ -18,9 +18,16 @@ public final class AuthDtos {
             @NotBlank @Size(min = 8, max = 100) String password,
             @NotBlank String firstName,
             @NotBlank String lastName,
-            String affiliation,
-            String country,
-            String orcid) {}
+            @NotBlank String title,
+            @NotBlank String phone,
+            @NotBlank String degree,
+            @NotBlank String position,
+            @NotBlank String affiliation,
+            @NotBlank String country,
+            @NotBlank String orcid,
+            // only these two are optional
+            String city,
+            String postalCode) {}
 
     public record RefreshRequest(@NotBlank String refreshToken) {}
 
