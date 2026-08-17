@@ -24,8 +24,17 @@ spring:
     locations: classpath:db/migration
   servlet:
     multipart:
-      max-file-size: 50MB
-      max-request-size: 60MB
+      # Overridable per environment so a smaller box can cap it lower without
+      # a rebuild. 400MB covers a full-issue scan with high-resolution plates.
+      max-file-size: ${UPLOAD_MAX_FILE_SIZE:400MB}
+      max-request-size: ${UPLOAD_MAX_REQUEST_SIZE:420MB}
+      # Spool to disk immediately rather than buffering in heap — at 400MB the
+      # default in-memory threshold would be an OOM waiting to happen.
+      file-size-threshold: 1MB
+      # Temp spool directory. Empty = the servlet container's default. Set
+      # UPLOAD_TMP_DIR to a path on a real volume if /tmp is a small tmpfs —
+      # a 400MB upload is written there in full before it is stored.
+      location: ${UPLOAD_TMP_DIR:}
   mail:
     host: ${MAIL_HOST:localhost}
     port: ${MAIL_PORT:1025}
@@ -39,6 +48,16 @@ server:
   port: ${SERVER_PORT:8080}
   servlet:
     context-path: /
+  tomcat:
+    # When a request is rejected (too large, unauthorised, validation error)
+    # Tomcat reads and discards the rest of the body so the connection can be
+    # reused. The default cap is 2MB; past that it resets the connection, and
+    # the browser reports "network error" instead of the 413 the server sent.
+    # -1 = swallow whatever it takes, so large uploads fail with a real message.
+    max-swallow-size: -1
+    # A 400MB upload over a slow link must not be killed mid-stream.
+    connection-timeout: ${SERVER_CONNECTION_TIMEOUT:300s}
+    max-http-form-post-size: ${UPLOAD_MAX_REQUEST_SIZE:420MB}
 
 # ----- application-specific config -----
 msj:
