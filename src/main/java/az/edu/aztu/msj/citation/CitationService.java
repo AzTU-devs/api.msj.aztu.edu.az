@@ -85,7 +85,11 @@ public class CitationService {
                 break;
             } catch (Exception e) {
                 failed++;
-                log.warn("Citation fetch failed for article {} (doi {}): {}", a.getId(), a.getDoi(), e.getMessage());
+                // The exception *type* is the diagnostic here — "Executing an
+                // update/delete query" and "404 Not Found" are very different
+                // problems and the message alone does not distinguish them.
+                log.warn("Citation refresh failed for article {} (doi {}): {}: {}",
+                        a.getId(), a.getDoi(), e.getClass().getSimpleName(), e.getMessage());
             }
         }
         Result r = new Result(list.size(), updated, failed, totalCitations);

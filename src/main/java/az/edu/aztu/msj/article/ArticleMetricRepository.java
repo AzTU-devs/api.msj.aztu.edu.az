@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -36,6 +37,10 @@ public interface ArticleMetricRepository extends JpaRepository<ArticleMetric, Lo
     List<Object[]> topArticles(@Param("limit") int limit);
 
     /** Upsert-and-increment a counter atomically; creates the row if missing. */
+    /** Same requirement as setCitationCount — MetricService.record() supplies a
+     *  transaction today, but the annotation belongs on the write itself so a
+     *  future caller cannot silently reintroduce the same failure. */
+    @Transactional
     @Modifying
     @Query(value = """
             insert into article_metrics (article_id, view_count, abstract_view_count, download_count, citation_count)
@@ -52,7 +57,19 @@ public interface ArticleMetricRepository extends JpaRepository<ArticleMetric, Lo
             """, nativeQuery = true)
     void increment(@Param("articleId") Long articleId, @Param("col") String eventType);
 
-    /** Set the citation count (from Crossref), creating the metrics row if missing. */
+    /**
+     * Set the citation count (from Crossref), creating the metrics row if missing.
+     *
+     * @Transactional is required, not decorative: a @Modifying query with no
+     * active transaction throws TransactionRequiredException. CitationService
+     * .refreshAll() is deliberately NOT transactional — it makes 51 HTTP calls
+     * with sleeps between them, and holding one transaction open across that
+     * would pin a connection for ~20s — so the transaction has to live here,
+     * one short write per article. Without it every call threw, refreshAll()
+     * swallowed the exception into its `failed` counter, and the sync reported
+     * "0/51 updated, 51 FAILED" while the Crossref fetches were all succeeding.
+     */
+    @Transactional
     @Modifying
     @Query(value = """
             insert into article_metrics (article_id, citation_count)
