@@ -77,7 +77,10 @@ public class HomeController {
         Map<String, Map<String, String>> textMap = texts.findAll().stream()
                 .collect(Collectors.toMap(SiteText::getKey, SiteText::getValue));
 
-        List<Issue> published = issues.findByStatusOrderBySortOrderAsc("PUBLISHED");
+        // "Current issue" = the newest by (year, number), not the lowest sortOrder:
+        // sortOrder defaults to 0 for every issue, so ordering by it made Number I
+        // of the current year outrank Number II once both were published.
+        List<Issue> published = issues.findByStatusOrderByYearDescNumberDescIdDesc("PUBLISHED");
         CurrentIssue current = null;
         if (!published.isEmpty()) {
             Issue latest = published.get(0);

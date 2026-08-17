@@ -12,6 +12,19 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
 
     List<Issue> findByStatusOrderBySortOrderAsc(String status);
 
+    /**
+     * Newest issue first, by the journal's own numbering: 2025 Number II ranks
+     * above 2025 Number I, which ranks above 2024 Number II. Used to pick the
+     * "current issue" on the homepage.
+     *
+     * The homepage previously took the first row of
+     * {@link #findByStatusOrderBySortOrderAsc(String)} and called it the latest.
+     * sortOrder is a manual display order that defaults to 0 for every issue, so
+     * with both numbers of a year published the tie broke on insertion order and
+     * Number I was shown as current for the rest of the year.
+     */
+    List<Issue> findByStatusOrderByYearDescNumberDescIdDesc(String status);
+
     /** Archive: publicly-visible issues grouped by year (newest first), Number I before II. */
     List<Issue> findByStatusInOrderByYearDescNumberAsc(List<String> statuses);
 
