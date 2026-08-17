@@ -93,9 +93,28 @@ public class CitationService {
         return r;
     }
 
+    /**
+     * Reduce whatever is stored in articles.doi to the bare identifier Crossref
+     * expects. The admin's DOI field is free text and the journal's own records
+     * quote DOIs as "https://doi.org/10.61413/XXXX", so a stored value may be a
+     * full URL or carry a "doi:" prefix. Left unnormalised, the lookup URL
+     * becomes api.crossref.org/works/https://doi.org/… and every request 404s —
+     * which is exactly how a refresh reports "updated 0/51" while the counts
+     * exist upstream.
+     */
+    static String normalizeDoi(String raw) {
+        if (raw == null) return "";
+        String d = raw.trim();
+        d = d.replaceFirst("(?i)^https?://(dx\\.)?doi\\.org/", "");
+        d = d.replaceFirst("(?i)^doi:\\s*", "");
+        return d.trim();
+    }
+
     private Integer fetchCount(String doi) {
+        String id = normalizeDoi(doi);
+        if (id.isEmpty()) return null;
         URI uri = UriComponentsBuilder
-                .fromUriString("https://api.crossref.org/works/" + doi.trim())
+                .fromUriString("https://api.crossref.org/works/" + id)
                 .queryParam("mailto", mailto)
                 .build()
                 .toUri();
@@ -128,7 +147,7 @@ public class CitationService {
             published++;
             if (a.getDoi() != null && !a.getDoi().isBlank()) {
                 already++;
-                used.add(a.getDoi().toLowerCase());
+                used.add(normalizeDoi(a.getDoi()).toLowerCase());
                 continue;
             }
             String doi = byTitle.get(normTitle(a.getTitle()));
