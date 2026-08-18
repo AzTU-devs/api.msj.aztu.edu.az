@@ -2,6 +2,8 @@ package az.edu.aztu.msj.review;
 
 import az.edu.aztu.msj.article.*;
 import az.edu.aztu.msj.common.ApiException;
+import az.edu.aztu.msj.issue.Issue;
+import az.edu.aztu.msj.issue.IssueRepository;
 import az.edu.aztu.msj.notification.NotificationService;
 import az.edu.aztu.msj.user.User;
 import az.edu.aztu.msj.user.UserRepository;
@@ -28,10 +30,12 @@ public class EditorialService {
     private final ReviewAssignmentRepository assignments;
     private final ReviewRepository reviews;
     private final NotificationService notifications;
+    private final IssueRepository issues;
 
     public EditorialService(UserRepository users, ArticleRepository articles, ArticleFileRepository files,
                             ArticleStatusHistoryRepository history, ReviewAssignmentRepository assignments,
-                            ReviewRepository reviews, NotificationService notifications) {
+                            ReviewRepository reviews, NotificationService notifications,
+                            IssueRepository issues) {
         this.users = users;
         this.articles = articles;
         this.files = files;
@@ -39,6 +43,7 @@ public class EditorialService {
         this.assignments = assignments;
         this.reviews = reviews;
         this.notifications = notifications;
+        this.issues = issues;
     }
 
     @Transactional(readOnly = true)
@@ -79,9 +84,17 @@ public class EditorialService {
                         h.getChangedBy() == null ? null : names.get(h.getChangedBy()), h.getComment(), h.getCreatedAt()))
                 .toList();
 
+        // Volume and number live on the issue, not the article — carried here
+        // so the editor form can show them without a second round trip.
+        Issue issue = a.getIssueId() == null ? null : issues.findById(a.getIssueId()).orElse(null);
+
         return new ReviewDtos.EditorialArticleDetail(a.getId(), a.getTitle(), a.getAbstractText(), a.getKeywords(),
-                a.getSubjectArea(), a.getLanguage(), a.getStatus(), a.getDoi(), a.getIssueId(), a.getSubmittedAt(),
-                a.getCreatedAt(), authors, fileDtos, assignmentDtos, reviewDtos, events);
+                a.getSubjectArea(), a.getLanguage(), a.getStatus(), a.getDoi(), a.getIssueId(),
+                a.getPageStart(), a.getPageEnd(), a.getArticleOrder(),
+                issue == null ? null : issue.getTitle(),
+                issue == null ? null : issue.getVolume(),
+                issue == null ? null : issue.getNumber(),
+                a.getSubmittedAt(), a.getCreatedAt(), authors, fileDtos, assignmentDtos, reviewDtos, events);
     }
 
     @Transactional

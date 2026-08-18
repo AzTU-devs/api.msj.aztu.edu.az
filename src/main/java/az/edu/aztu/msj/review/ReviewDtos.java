@@ -48,9 +48,22 @@ public final class ReviewDtos {
 
     public record StatusEvent(String fromStatus, String toStatus, String changedByName, String comment, Instant at) {}
 
+    /**
+     * pageStart/pageEnd/articleOrder are part of the record because the editor
+     * form round-trips them: it loads this payload and PUTs the whole object
+     * back. While they were missing, every save sent nulls and silently wiped
+     * an article's pagination and its position in the issue — and pagination is
+     * what feeds citation_firstpage/citation_lastpage for Google Scholar.
+     *
+     * issueVolume/issueNumber are the parent issue's, denormalised for display
+     * only. Volume and number belong to the issue, not the article; sending
+     * them down avoids a second fetch just to show "Volume 12 · Number II".
+     */
     public record EditorialArticleDetail(Long id, String title, String abstractText, String keywords,
                                          String subjectArea, String language, String status, String doi,
-                                         Long issueId, OffsetDateTime submittedAt, Instant createdAt,
+                                         Long issueId, Integer pageStart, Integer pageEnd, Integer articleOrder,
+                                         String issueTitle, Integer issueVolume, Integer issueNumber,
+                                         OffsetDateTime submittedAt, Instant createdAt,
                                          List<AuthorDto> authors, List<FileDto> files,
                                          List<AssignmentDto> assignments, List<EditorReview> reviews,
                                          List<StatusEvent> history) {}
