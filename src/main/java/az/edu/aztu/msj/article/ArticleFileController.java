@@ -43,7 +43,8 @@ public class ArticleFileController {
                 .or(() -> files.findFirstByArticleIdAndKindOrderByVersionDesc(id, "MANUSCRIPT"))
                 .orElseThrow(() -> ApiException.notFound("PDF"));
 
-        metrics.record(id, "PDF_DOWNLOAD", clientIp(http), http.getHeader("User-Agent"), http.getHeader("Referer"));
+        metrics.record(id, "PDF_DOWNLOAD", clientIp(http), http.getHeader("User-Agent"),
+                http.getHeader("Referer"), http.getHeader("CF-IPCountry"));
 
         // A stored PDF is served inline; an external URL is redirected to.
         String key = file.getStorageKey();

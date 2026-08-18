@@ -32,7 +32,8 @@ public class MetricService {
      * counters only move when the raw insert actually lands.
      */
     @Transactional
-    public void record(Long articleId, String type, String ip, String userAgent, String referrer) {
+    public void record(Long articleId, String type, String ip, String userAgent, String referrer,
+                       String country) {
         if (articleId == null || !VALID.contains(type)) {
             throw ApiException.badRequest("Invalid metric event");
         }
@@ -40,7 +41,8 @@ public class MetricService {
         String sessionHash = hash((ip == null ? "" : ip) + "|" + (userAgent == null ? "" : userAgent) + "|" + today);
         String ipHash = ip == null ? null : hash(ip);
 
-        int inserted = events.insertDedup(articleId, type, sessionHash, ipHash, referrer, truncate(userAgent, 400));
+        int inserted = events.insertDedup(articleId, type, sessionHash, ipHash, referrer,
+                truncate(userAgent, 400), normalizeCountry(country));
         if (inserted == 0) {
             return; // duplicate within the dedup window — do not double count
         }
@@ -63,5 +65,18 @@ public class MetricService {
 
     private String truncate(String s, int max) {
         return (s != null && s.length() > max) ? s.substring(0, max) : s;
+    }
+
+    /**
+     * ISO-3166-1 alpha-2, or null. Cloudflare sends CF-IPCountry on every
+     * proxied request; it also uses "XX" for unknown and "T1" for Tor, neither
+     * of which is a country, so both are stored as null.
+     */
+    static String normalizeCountry(String raw) {
+        if (raw == null) return null;
+        String c = raw.trim().toUpperCase();
+        if (c.length() != 2 || !c.chars().allMatch(Character::isLetter)) return null;
+        if (c.equals("XX") || c.equals("T1")) return null;
+        return c;
     }
 }

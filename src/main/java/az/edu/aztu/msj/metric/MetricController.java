@@ -24,8 +24,20 @@ public class MetricController {
     @Operation(summary = "Record an anonymous view/download event (deduplicated per session/day)")
     public ResponseEntity<Void> record(@RequestBody EventRequest req, HttpServletRequest http) {
         service.record(req.articleId(), req.type(), clientIp(http),
-                http.getHeader("User-Agent"), http.getHeader("Referer"));
+                http.getHeader("User-Agent"), http.getHeader("Referer"), country(http));
         return ResponseEntity.accepted().build();
+    }
+
+    /**
+     * Reader country, from the CDN rather than a GeoIP database. Cloudflare
+     * fronts the public site and sets CF-IPCountry on every request; nginx and
+     * the Next proxy pass it through untouched. CF-Ipcountry is the fallback
+     * spelling some intermediaries normalise to.
+     */
+    private String country(HttpServletRequest req) {
+        String c = req.getHeader("CF-IPCountry");
+        if (c == null || c.isBlank()) c = req.getHeader("X-Country-Code");
+        return c;
     }
 
     private String clientIp(HttpServletRequest req) {
