@@ -1,6 +1,7 @@
 package az.edu.aztu.msj.article;
 
 import az.edu.aztu.msj.common.ApiException;
+import az.edu.aztu.msj.common.TextSanitizer;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -75,16 +76,26 @@ public class AdminArticleService {
         }
     }
 
-    /** Shared title/abstract/keywords/subject/language/doi/issue + author replacement. */
+    /**
+     * Shared title/abstract/keywords/subject/language/doi/issue + author replacement.
+     *
+     * <p>Sanitised on the same terms as the author-submission path: an editor
+     * account is more trusted, but it is still an account that can be phished,
+     * and these values are published verbatim on the public site.
+     */
     private void applyMetadata(Article a, AdminArticleDtos.CreateArticleRequest req) {
-        a.setTitle(req.title());
-        a.setAbstractText(req.abstractText());
-        a.setKeywords(req.keywords());
-        a.setSubjectArea(req.subjectArea());
-        a.setLanguage(req.language() == null || req.language().isBlank() ? "en" : req.language());
+        String title = TextSanitizer.title(req.title());
+        if (title == null) throw ApiException.badRequest("Title is required");
+
+        a.setTitle(title);
+        a.setAbstractText(TextSanitizer.longText(req.abstractText()));
+        a.setKeywords(TextSanitizer.text(req.keywords(), 1000));
+        a.setSubjectArea(TextSanitizer.shortText(req.subjectArea()));
+        String lang = req.language() == null ? "" : req.language().trim().toLowerCase();
+        a.setLanguage(List.of("en", "az", "ru").contains(lang) ? lang : "en");
         // blank DOI must be NULL, not "" — the unique index ux_articles_doi treats
         // every "" as the same value, so two DOI-less articles would collide.
-        a.setDoi(req.doi() == null || req.doi().isBlank() ? null : req.doi().trim());
+        a.setDoi(TextSanitizer.shortText(req.doi()));
         a.setIssueId(req.issueId());
 
         a.getAuthors().clear();   // orphanRemoval deletes the previous rows
@@ -92,13 +103,18 @@ public class AdminArticleService {
         boolean anyCorresponding = in.stream().anyMatch(AdminArticleDtos.AuthorInput::corresponding);
         for (int i = 0; i < in.size(); i++) {
             AdminArticleDtos.AuthorInput ai = in.get(i);
+            String first = TextSanitizer.shortText(ai.firstName());
+            String last = TextSanitizer.shortText(ai.lastName());
+            if (first == null || last == null)
+                throw ApiException.badRequest("Each author needs a first and last name");
+
             ArticleAuthor au = new ArticleAuthor();
-            au.setFirstName(ai.firstName());
-            au.setLastName(ai.lastName());
-            au.setEmail(ai.email());
-            au.setAffiliation(ai.affiliation());
-            au.setCountry(ai.country());
-            au.setOrcid(ai.orcid());
+            au.setFirstName(first);
+            au.setLastName(last);
+            au.setEmail(TextSanitizer.email(ai.email()));
+            au.setAffiliation(TextSanitizer.text(ai.affiliation(), 1000));
+            au.setCountry(TextSanitizer.shortText(ai.country()));
+            au.setOrcid(TextSanitizer.shortText(ai.orcid()));
             au.setAuthorOrder(i);
             au.setCorresponding(ai.corresponding() || (!anyCorresponding && i == 0));
             a.addAuthor(au);

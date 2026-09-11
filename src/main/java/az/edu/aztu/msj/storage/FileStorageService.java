@@ -67,12 +67,49 @@ public class FileStorageService {
         }
     }
 
-    /** Guard against path traversal — keys must stay under the root. */
+    public void delete(String key) {
+        try {
+            Files.deleteIfExists(resolve(key));
+        } catch (IOException e) {
+            throw ApiException.badRequest("Failed to delete file: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Guard against path traversal.
+     *
+     * <p>A {@code startsWith(root)} check alone is not enough: it accepts
+     * {@code articles/1/../../public/uploads/x}, which normalises back under the
+     * root while landing in a subtree the caller had no business writing to — the
+     * publicly served one, for instance. So the key's <em>shape</em> is validated
+     * before it is resolved, and traversal segments are refused outright.
+     */
     private Path resolve(String key) {
+        if (key == null || key.isBlank()) {
+            throw ApiException.badRequest("Illegal storage key");
+        }
+        if (key.indexOf('\0') >= 0 || key.indexOf('\\') >= 0) {
+            throw ApiException.badRequest("Illegal storage key");
+        }
+        if (key.startsWith("/") || key.contains("//")) {
+            throw ApiException.badRequest("Illegal storage key");
+        }
+        for (String segment : key.split("/")) {
+            if (segment.isEmpty() || segment.equals(".") || segment.equals("..")) {
+                throw ApiException.badRequest("Illegal storage key");
+            }
+            if (!SAFE_SEGMENT.matcher(segment).matches()) {
+                throw ApiException.badRequest("Illegal storage key");
+            }
+        }
         Path p = root.resolve(key).normalize();
         if (!p.startsWith(root)) {
             throw ApiException.badRequest("Illegal storage key");
         }
         return p;
     }
+
+    /** Conservative on purpose — every key we generate is machine-built. */
+    private static final java.util.regex.Pattern SAFE_SEGMENT =
+            java.util.regex.Pattern.compile("[A-Za-z0-9._-]{1,128}");
 }

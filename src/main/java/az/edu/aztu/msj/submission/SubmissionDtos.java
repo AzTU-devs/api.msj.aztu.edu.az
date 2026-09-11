@@ -3,6 +3,7 @@ package az.edu.aztu.msj.submission;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -11,22 +12,24 @@ import java.util.List;
 public final class SubmissionDtos {
 
     public record AuthorInput(
-            @NotBlank String firstName,
-            @NotBlank String lastName,
-            String email,
-            String affiliation,
-            String country,
-            String orcid,
+            @NotBlank @Size(max = 255) String firstName,
+            @NotBlank @Size(max = 255) String lastName,
+            @Size(max = 255) String email,
+            @Size(max = 1000) String affiliation,
+            @Size(max = 255) String country,
+            @Size(max = 255) String orcid,
             boolean corresponding) {}
 
     public record SubmissionInput(
-            @NotBlank String title,
-            String abstractText,
-            String keywords,
-            String subjectArea,
-            String language,
+            @NotBlank @Size(max = 500) String title,
+            @Size(max = 20_000) String abstractText,
+            @Size(max = 1000) String keywords,
+            @Size(max = 255) String subjectArea,
+            @Size(max = 16) String language,
             Long issueId,                     // target section the author submits to
-            @NotEmpty @Valid List<AuthorInput> authors) {}
+            // Capped: the list is replaced wholesale on every save, so an
+            // unbounded one is a cheap way to fill the database.
+            @NotEmpty @Size(max = 50) @Valid List<AuthorInput> authors) {}
 
     public record FileDto(Long id, String kind, String originalName, Long sizeBytes, String contentType, Instant createdAt) {}
 

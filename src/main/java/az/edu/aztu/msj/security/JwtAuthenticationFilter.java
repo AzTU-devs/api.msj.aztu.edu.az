@@ -1,5 +1,7 @@
 package az.edu.aztu.msj.security;
 
+import az.edu.aztu.msj.user.User;
+import az.edu.aztu.msj.user.UserRepository;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -21,9 +23,11 @@ import java.util.List;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final UserRepository users;
 
-    public JwtAuthenticationFilter(JwtService jwtService) {
+    public JwtAuthenticationFilter(JwtService jwtService, UserRepository users) {
         this.jwtService = jwtService;
+        this.users = users;
     }
 
     @Override
@@ -39,11 +43,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Claims claims = jwtService.parse(token);
                 Long userId = Long.valueOf(claims.getSubject());
                 String email = claims.get("email", String.class);
-                List<String> roles = claims.get("roles", List.class);
-                var authorities = roles == null ? List.<SimpleGrantedAuthority>of()
-                        : roles.stream().map(r -> new SimpleGrantedAuthority("ROLE_" + r)).toList();
 
-                var principal = new JwtPrincipal(userId, email, roles == null ? List.of() : roles);
+                // A token is a snapshot taken at login; the account it names can be
+                // blocked, deleted or re-roled a minute later. Re-reading the row
+                // here is what makes "block this user" mean *now* rather than
+                // whenever their access token happens to run out — and it means
+                // roles revoked by an admin stop working just as promptly.
+                User user = users.findById(userId).orElse(null);
+                if (user == null || !"ACTIVE".equals(user.getStatus())) {
+                    chain.doFilter(request, response);
+                    return;
+                }
+
+                List<String> roles = List.copyOf(user.getRoles());
+                var authorities = roles.stream()
+                        .map(r -> new SimpleGrantedAuthority("ROLE_" + r)).toList();
+
+                var principal = new JwtPrincipal(userId, email, roles);
                 var authentication = new UsernamePasswordAuthenticationToken(principal, null, authorities);
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authentication);

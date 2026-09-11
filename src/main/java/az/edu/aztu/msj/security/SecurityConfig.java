@@ -19,6 +19,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 
 @Configuration
 @EnableMethodSecurity
@@ -36,7 +37,23 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .cors(c -> c.configurationSource(corsConfigurationSource()))
+                // Safe to disable: authentication is a Bearer token read from a
+                // header, never an ambient cookie, so there is nothing for a
+                // cross-site form post to ride on.
                 .csrf(csrf -> csrf.disable())
+                .headers(h -> h
+                        .contentTypeOptions(withDefaults -> {})
+                        .frameOptions(f -> f.deny())
+                        .httpStrictTransportSecurity(hsts -> hsts
+                                .includeSubDomains(true)
+                                .maxAgeInSeconds(31_536_000))
+                        .referrerPolicy(r -> r.policy(
+                                org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter
+                                        .ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)))
+                // No global CSP: Swagger UI is served from this origin and needs to
+                // run its own scripts. The policy that matters is the strict one
+                // UploadedContentHeadersFilter puts on /files/**, where attacker-
+                // supplied bytes actually live.
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // public reads
@@ -88,14 +105,31 @@ public class SecurityConfig {
         return provider::authenticate;
     }
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SecurityConfig.class);
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration cfg = new CorsConfiguration();
-        List<String> origins = Arrays.stream(props.cors().allowedOrigins().split(","))
+        List<String> configured = Arrays.stream(props.cors().allowedOrigins().split(","))
                 .map(String::trim).filter(s -> !s.isEmpty()).toList();
-        // Origin PATTERNS (not plain origins) so a wildcard "*" is permitted even with
-        // allowCredentials(true) — Spring reflects the request origin back instead of
-        // emitting a literal "*". Exact domains still match as patterns.
+
+        // Origin PATTERNS (not plain origins) so exact domains still match as
+        // patterns. A bare "*" is dropped: combined with allowCredentials(true)
+        // Spring reflects whatever Origin was sent straight back, which turns
+        // every site on the internet into a permitted caller. When that is all
+        // that was configured, fall back to the journal's own front ends.
+        List<String> origins = configured.stream().filter(o -> !o.equals("*")).toList();
+        if (origins.size() != configured.size()) {
+            log.warn("msj.cors.allowed-origins contained \"*\"; ignoring it — a wildcard cannot be "
+                    + "combined with credentialed CORS. Configure the real front-end origins.");
+        }
+        if (origins.isEmpty()) {
+            origins = Stream.of(props.frontend().webUrl(), props.frontend().adminUrl())
+                    .filter(s -> s != null && !s.isBlank())
+                    .map(String::trim)
+                    .toList();
+            log.warn("No usable CORS origins configured; defaulting to {}", origins);
+        }
         cfg.setAllowedOriginPatterns(origins);
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         cfg.setAllowedHeaders(List.of("*"));

@@ -2,12 +2,14 @@ package az.edu.aztu.msj.submission;
 
 import az.edu.aztu.msj.article.*;
 import az.edu.aztu.msj.common.ApiException;
+import az.edu.aztu.msj.common.TextSanitizer;
 import az.edu.aztu.msj.issue.Issue;
 import az.edu.aztu.msj.issue.IssueRepository;
 import az.edu.aztu.msj.notification.NotificationService;
 import az.edu.aztu.msj.review.Review;
 import az.edu.aztu.msj.review.ReviewRepository;
 import az.edu.aztu.msj.storage.FileStorageService;
+import az.edu.aztu.msj.storage.UploadPolicy;
 import az.edu.aztu.msj.user.User;
 import az.edu.aztu.msj.user.UserRepository;
 import org.springframework.stereotype.Service;
@@ -86,20 +88,25 @@ public class SubmissionService {
     public SubmissionDtos.FileDto upload(Long uid, Long id, MultipartFile file, String kind) {
         Article a = owned(uid, id);
         requireEditable(a);
-        if (file.isEmpty()) throw ApiException.badRequest("Empty file");
         String k = normalizeKind(kind);
+
+        // This endpoint is reachable by any registered author, so it is the most
+        // exposed upload in the system: the file's own bytes must vouch for it.
+        UploadPolicy.Accepted accepted = UploadPolicy.validate(file, UploadPolicy.Kind.DOCUMENT);
+
         int version = files.findByArticleIdOrderByCreatedAtDesc(id).stream()
                 .filter(f -> f.getKind().equals(k)).map(ArticleFile::getVersion).max(Integer::compareTo).orElse(0) + 1;
-        String original = file.getOriginalFilename() == null ? "upload" : file.getOriginalFilename();
-        String ext = original.contains(".") ? original.substring(original.lastIndexOf('.')) : "";
-        String key = "articles/" + id + "/" + k.toLowerCase() + "-v" + version + ext;
+        String key = "articles/" + id + "/" + k.toLowerCase() + "-v" + version + accepted.extension();
         storage.store(file, key);
+
+        String original = TextSanitizer.shortText(file.getOriginalFilename());
+
         ArticleFile af = new ArticleFile();
         af.setArticleId(id);
         af.setKind(k);
-        af.setOriginalName(original);
+        af.setOriginalName(original == null ? "upload" + accepted.extension() : original);
         af.setStorageKey(key);
-        af.setContentType(file.getContentType());
+        af.setContentType(accepted.contentType());
         af.setSizeBytes(file.getSize());
         af.setVersion(version);
         af.setUploadedBy(uid);
@@ -164,12 +171,23 @@ public class SubmissionService {
 
     // ---- helpers ----
 
+    /**
+     * Copies the author's input onto the entity, stripping markup on the way in.
+     *
+     * <p>Every field here is free text typed by a self-registered account and is
+     * later rendered in the editorial dashboard, in notification e-mails and on
+     * the public site. Sanitising at this boundary means a payload is never
+     * stored, rather than relying on each of those renderers to escape it.
+     */
     private void applyInput(Article a, SubmissionDtos.SubmissionInput in) {
-        a.setTitle(in.title());
-        a.setAbstractText(in.abstractText());
-        a.setKeywords(in.keywords());
-        a.setSubjectArea(in.subjectArea());
-        a.setLanguage(in.language() == null || in.language().isBlank() ? "en" : in.language());
+        String title = TextSanitizer.title(in.title());
+        if (title == null) throw ApiException.badRequest("Title is required");
+
+        a.setTitle(title);
+        a.setAbstractText(TextSanitizer.longText(in.abstractText()));
+        a.setKeywords(TextSanitizer.text(in.keywords(), 1000));
+        a.setSubjectArea(TextSanitizer.shortText(in.subjectArea()));
+        a.setLanguage(normalizeLanguage(in.language()));
         if (in.issueId() != null) a.setIssueId(in.issueId());   // target section
 
         a.getAuthors().clear();
@@ -177,17 +195,28 @@ public class SubmissionService {
         boolean anyCorresponding = in2.stream().anyMatch(SubmissionDtos.AuthorInput::corresponding);
         for (int i = 0; i < in2.size(); i++) {
             SubmissionDtos.AuthorInput ai = in2.get(i);
+            String first = TextSanitizer.shortText(ai.firstName());
+            String last = TextSanitizer.shortText(ai.lastName());
+            if (first == null || last == null)
+                throw ApiException.badRequest("Each author needs a first and last name");
+
             ArticleAuthor au = new ArticleAuthor();
-            au.setFirstName(ai.firstName());
-            au.setLastName(ai.lastName());
-            au.setEmail(ai.email());
-            au.setAffiliation(ai.affiliation());
-            au.setCountry(ai.country());
-            au.setOrcid(ai.orcid());
+            au.setFirstName(first);
+            au.setLastName(last);
+            au.setEmail(TextSanitizer.email(ai.email()));
+            au.setAffiliation(TextSanitizer.text(ai.affiliation(), 1000));
+            au.setCountry(TextSanitizer.shortText(ai.country()));
+            au.setOrcid(TextSanitizer.shortText(ai.orcid()));
             au.setAuthorOrder(i);
             au.setCorresponding(ai.corresponding() || (!anyCorresponding && i == 0));
             a.addAuthor(au);
         }
+    }
+
+    /** Only the locales the site actually renders in. */
+    private String normalizeLanguage(String raw) {
+        String lang = raw == null ? "" : raw.trim().toLowerCase();
+        return Set.of("en", "az", "ru").contains(lang) ? lang : "en";
     }
 
     private Article owned(Long uid, Long id) {

@@ -40,4 +40,7 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
     Page<Article> findForAdmin(@Param("status") String status, Pageable pageable);
 
     long countByStatus(String status);
+
+    /** Guards account deletion — an account with a publication history is blocked, not removed. */
+    long countBySubmitterId(Long submitterId);
 }
